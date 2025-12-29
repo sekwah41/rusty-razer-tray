@@ -1,7 +1,10 @@
 mod openrazer;
 
+use std::env;
+use std::fs::OpenOptions;
 use std::time::Duration;
 
+use fs2::FileExt;
 use ksni::menu::{Disposition, StandardItem};
 use ksni::{Tray, TrayMethods};
 use openrazer::Manager;
@@ -40,6 +43,14 @@ impl Tray for BatteryTray {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let _lock_file = match acquire_single_instance_lock() {
+        Ok(lock) => lock,
+        Err(err) => {
+            eprintln!("Another instance is already running or lock failed: {err}");
+            return;
+        }
+    };
+
     let handle = BatteryTray { counter: 0 }.spawn().await.unwrap();
     let manager = match Manager::new().await {
         Ok(manager) => manager,
@@ -62,6 +73,18 @@ async fn main() {
     });
 
     std::future::pending::<()>().await;
+}
+
+fn acquire_single_instance_lock() -> std::io::Result<std::fs::File> {
+    let runtime_dir = env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+    let lock_path = format!("{}/rusty-razer-tray.lock", runtime_dir);
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(lock_path)?;
+    file.try_lock_exclusive()?;
+    Ok(file)
 }
 
 async fn read_battery_percent(manager: &Manager) -> Option<u8> {
