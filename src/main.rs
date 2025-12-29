@@ -1,7 +1,10 @@
+mod openrazer;
+
 use std::time::Duration;
 
-use ksni::{Tray, TrayMethods};
 use ksni::menu::{Disposition, StandardItem};
+use ksni::{Tray, TrayMethods};
+use openrazer::Manager;
 
 struct BatteryTray {
     counter: u8,
@@ -38,17 +41,45 @@ impl Tray for BatteryTray {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let handle = BatteryTray { counter: 0 }.spawn().await.unwrap();
+    let manager = match Manager::new().await {
+        Ok(manager) => manager,
+        Err(err) => {
+            eprintln!("Failed to connect to OpenRazer via D-Bus: {err}");
+            std::future::pending::<()>().await;
+            return;
+        }
+    };
 
     tokio::spawn(async move {
         let mut value = 0u8;
         loop {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
-            value = if value >= 100 { 0 } else { value + 1 };
+            if let Some(percent) = read_battery_percent(&manager).await {
+                value = percent;
+            }
             let _ = handle.update(|tray| tray.counter = value).await;
+            tokio::time::sleep(Duration::from_millis(1000)).await;
         }
     });
 
     std::future::pending::<()>().await;
+}
+
+async fn read_battery_percent(manager: &Manager) -> Option<u8> {
+    let devices = manager.get_devices().await.ok()?;
+    for path in devices {
+        let device = match manager.get_device(path).await {
+            Ok(device) => device,
+            Err(_) => continue,
+        };
+        if !device.has_feature("battery") {
+            continue;
+        }
+        if let Ok(percent) = device.get_battery_percent().await {
+            let percent = percent.round().clamp(0.0, 100.0) as u8;
+            return Some(percent);
+        }
+    }
+    None
 }
 
 fn render_digit_icon(value: u8) -> ksni::Icon {
