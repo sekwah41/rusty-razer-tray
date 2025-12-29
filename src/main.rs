@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use ksni::{Tray, TrayMethods};
+use ksni::menu::{Disposition, StandardItem};
 
 struct BatteryTray {
     counter: u8,
@@ -21,7 +22,16 @@ impl Tray for BatteryTray {
     }
 
     fn menu(&self) -> Vec<ksni::menu::MenuItem<Self>> {
-        vec!(ksni::menu::MenuItem::Standard())
+        vec!(ksni::MenuItem::Standard(StandardItem {
+            label: format!("Battery Level {}%", self.counter),
+            enabled: false,
+            visible: true,
+            icon_name: "".to_string(),
+            icon_data: vec![],
+            shortcut: vec![],
+            disposition: Disposition::Normal,
+            activate: Box::new(|_this| {}),
+        }))
     }
 }
 
