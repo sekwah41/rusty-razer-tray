@@ -1,5 +1,5 @@
 [package]
-name = "razer-battery-tray"
+name = "rusty-razer-tray"
 version = "0.1.0"
 edition = "2024"
 

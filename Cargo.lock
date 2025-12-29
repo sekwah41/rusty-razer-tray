@@ -679,19 +679,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "razer-battery-tray"
-version = "0.1.0"
-dependencies = [
- "ksni",
- "roxmltree",
- "serde",
- "serde_json",
- "tokio",
- "zbus 4.4.0",
- "zvariant 4.2.0",
-]
-
-[[package]]
 name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -715,6 +702,19 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rusty-razer-tray"
+version = "0.1.0"
+dependencies = [
+ "ksni",
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zbus 4.4.0",
+ "zvariant 4.2.0",
+]
 
 [[package]]
 name = "serde"
