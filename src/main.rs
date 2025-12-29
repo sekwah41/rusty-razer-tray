@@ -2,6 +2,9 @@ mod openrazer;
 
 use std::env;
 use std::fs::OpenOptions;
+use std::io;
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
 use fs2::FileExt;
@@ -41,8 +44,23 @@ impl Tray for BatteryTray {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
+fn main() {
+    println!("Starting rusty-razer-tray...");
+
+    if let Err(err) = daemonize_background() {
+        eprintln!("Failed to run in background: {err}");
+        return;
+    }
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+        .expect("failed to start tokio runtime");
+    runtime.block_on(async_main());
+}
+
+async fn async_main() {
     let _lock_file = match acquire_single_instance_lock() {
         Ok(lock) => lock,
         Err(err) => {
@@ -73,6 +91,50 @@ async fn main() {
     });
 
     std::future::pending::<()>().await;
+}
+
+#[cfg(unix)]
+fn daemonize_background() -> io::Result<()> {
+    if env::var_os("RUSTY_RAZER_TRAY_FOREGROUND").is_some() {
+        return Ok(());
+    }
+
+    unsafe {
+        let pid = libc::fork();
+        if pid < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if pid > 0 {
+            std::process::exit(0);
+        }
+
+        if libc::setsid() < 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        let pid = libc::fork();
+        if pid < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if pid > 0 {
+            std::process::exit(0);
+        }
+    }
+
+    let devnull = OpenOptions::new().read(true).write(true).open("/dev/null")?;
+    let fd = devnull.as_raw_fd();
+    unsafe {
+        libc::dup2(fd, libc::STDIN_FILENO);
+        libc::dup2(fd, libc::STDOUT_FILENO);
+        libc::dup2(fd, libc::STDERR_FILENO);
+    }
+
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn daemonize_background() -> io::Result<()> {
+    Ok(())
 }
 
 fn acquire_single_instance_lock() -> std::io::Result<std::fs::File> {
